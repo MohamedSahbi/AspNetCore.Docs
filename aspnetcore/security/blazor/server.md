@@ -5,7 +5,7 @@ description: Learn how to mitigate security threats to Blazor Server apps.
 monikerRange: '>= aspnetcore-3.1'
 ms.author: riande
 ms.custom: mvc
-ms.date: 04/02/2020
+ms.date: 04/13/2020
 no-loc: [Blazor, SignalR]
 uid: security/blazor/server
 ---
@@ -95,9 +95,20 @@ The command creates a folder named with the value provided for the `{APP NAME}` 
 
 ---
 
-## Pass tokens to a Blazor Server app
+## Scaffold Identity
 
-Authenticate the Blazor Server app as you would with a regular Razor Pages or MVC app. Provision and save the tokens to the authentication cookie. For example:
+To scaffold Idenity into a Blazor Server project, see the following articles:
+
+* [Scaffold Identity into a Blazor Server project without existing authorization](xref:security/authentication/scaffold-identity#scaffold-identity-into-a-blazor-server-project-without-existing-authorization)
+* [Scaffold Identity into a Blazor Server project with authorization](xref:security/authentication/scaffold-identity#scaffold-identity-into-a-blazor-server-project-with-authorization)
+
+## Pass tokens
+
+Authentication tokens that are only available outside of Razor components can be passed to components by implementing a token provider.
+
+Other types of tokens can also be passed to a Blazor Server app. For example, [anti-request forgery (XSRF) tokens](xref:security/anti-request-forgery) can be passed to components that POST to Identity's logout endpoint at `/Identity/Account/Logout`.
+
+To pass authentication tokens, authenticate the Blazor Server app as you would with a regular Razor Pages or MVC app. Provision and save the tokens to the authentication cookie:
 
 ```csharp
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -117,27 +128,27 @@ services.Configure<OpenIdConnectOptions>(AzureADDefaults.OpenIdScheme, options =
 
 For sample code, including a complete `Startup.ConfigureServices` example, see the [Passing tokens to a server-side Blazor application](https://github.com/javiercn/blazor-server-aad-sample).
 
-Define a class to pass in the initial app state with the access and refresh tokens:
+To provide an XSRF token and authentication tokens to any component that requires them, adopt the following pattern.
+
+Define a class to pass in the initial app state with the access, refresh, and XSRF tokens:
 
 ```csharp
 public class InitialApplicationState
 {
     public string AccessToken { get; set; }
     public string RefreshToken { get; set; }
+    public string AntiXsrfToken { get; set; }
 }
 ```
 
 Define a **scoped** token provider service that can be used within the Blazor app to resolve the tokens from DI:
 
 ```csharp
-using System;
-using System.Security.Claims;
-using System.Threading.Tasks;
-
 public class TokenProvider
 {
     public string AccessToken { get; set; }
     public string RefreshToken { get; set; }
+    public string AntiXsrfToken { get; set; }
 }
 ```
 
@@ -155,6 +166,7 @@ In the *_Host.cshtml* file, create and instance of `InitialApplicationState` and
 
 ```cshtml
 @using Microsoft.AspNetCore.Authentication
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
 
 ...
 
@@ -162,7 +174,8 @@ In the *_Host.cshtml* file, create and instance of `InitialApplicationState` and
     var tokens = new InitialApplicationState
     {
         AccessToken = await HttpContext.GetTokenAsync("access_token"),
-        RefreshToken = await HttpContext.GetTokenAsync("refresh_token")
+        RefreshToken = await HttpContext.GetTokenAsync("refresh_token"),
+        AntiXsrfToken = Xsrf.GetAndStoreTokens(HttpContext).RequestToken
     };
 }
 
@@ -175,7 +188,7 @@ In the *_Host.cshtml* file, create and instance of `InitialApplicationState` and
 In the `App` component (*App.razor*), resolve the service and initialize it with the data from the parameter:
 
 ```razor
-@inject TokenProvider TokensProvider
+@inject TokenProvider TokenProvider
 
 ...
 
@@ -185,8 +198,9 @@ In the `App` component (*App.razor*), resolve the service and initialize it with
 
     protected override Task OnInitializedAsync()
     {
-        TokensProvider.AccessToken = InitialState.AccessToken;
-        TokensProvider.RefreshToken = InitialState.RefreshToken;
+        TokenProvider.AccessToken = InitialState.AccessToken;
+        TokenProvider.RefreshToken = InitialState.RefreshToken;
+        TokenProvider.AntiXsrfToken = InitialState.AntiXsrfToken;
 
         return base.OnInitializedAsync();
     }
@@ -221,6 +235,31 @@ public class WeatherForecastService
         return await response.Content.ReadAsAsync<WeatherForecast[]>();
     }
 }
+```
+
+Any Razor component can request the `TokenProvider` service and obtain the XSRF token for an HTML form. In the following example, the logout HTML form includes the XSRF token (`__RequestVerificationToken`) from the `TokenProvider` when the form is submitted:
+
+```razor
+@using Microsoft.AspNetCore.Components.Authorization
+@inject TokenProvider TokenProvider
+@inject NavigationManager Navigation
+
+<AuthorizeView>
+    <Authorized>
+        <a href="Identity/Account/Manage/Index">
+            Hello, @context.User.Identity.Name!
+        </a>
+        <form action="/Identity/Account/Logout?returnUrl=%2F" method="post">
+            <button class="nav-link btn btn-link" type="submit">Logout</button>
+            <input name="__RequestVerificationToken" type="hidden" 
+                value="@TokenProvider.AntiXsrfToken">
+        </form>
+    </Authorized>
+    <NotAuthorized>
+        <a href="Identity/Account/Register">Register</a>
+        <a href="Identity/Account/Login">Login</a>
+    </NotAuthorized>
+</AuthorizeView>
 ```
 
 ## Resource exhaustion
