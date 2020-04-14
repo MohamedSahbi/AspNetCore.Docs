@@ -178,11 +178,12 @@ For more information and example code, see [Pass tokens to a Blazor Server app](
 In the `Startup` class:
 
 * Confirm that Razor Pages services are added in `Startup.ConfigureServices`.
+* If using the [TokenProvider](xref:security/blazor/server#pass-tokens), register the service.
 * Call `UseDatabaseErrorPage` on the application builder in `Startup.Configure` for the Development environment.
 * Call `UseAuthentication` and `UseAuthorization` after `UseRouting`.
 * Add an endpoint for Razor Pages.
 
-[!code-csharp[](scaffold-identity/3.1sample/StartupBlazor.cs?highlight=3,14,27-28,32)]
+[!code-csharp[](scaffold-identity/3.1sample/StartupBlazor.cs?highlight=3,6,14,27-28,32)]
 
 [!INCLUDE[](~/includes/scaffold-identity/hsts.md)]
 
@@ -213,7 +214,7 @@ Add a `LoginDisplay` component (*LoginDisplay.razor*) to the app's *Shared* fold
             Hello, @context.User.Identity.Name!
         </a>
         <form action="/Identity/Account/Logout?returnUrl=%2F" method="post">
-            <button class="nav-link btn btn-link" type="submit">Logout form</button>
+            <button class="nav-link btn btn-link" type="submit">Logout</button>
             <input name="__RequestVerificationToken" type="hidden" 
                 value="@TokenProvider.AntiXsrfToken">
         </form>
@@ -223,13 +224,6 @@ Add a `LoginDisplay` component (*LoginDisplay.razor*) to the app's *Shared* fold
         <a href="Identity/Account/Login">Login</a>
     </NotAuthorized>
 </AuthorizeView>
-
-@code{
-    private void BeginLogout(MouseEventArgs args)
-    {
-        Navigation.NavigateTo("Identity/Account/Logout");
-    }
-}
 ```
 
 In the `MainLayout` component (*Shared/MainLayout.razor*), add the `LoginDisplay` component to the top-row `<div>` element's content:
@@ -241,14 +235,21 @@ In the `MainLayout` component (*Shared/MainLayout.razor*), add the `LoginDisplay
 </div>
 ```
 
-Replace the `App` component (*App.razor*) with the following code that triggers the `RedirectToLogin` component navigation when a user isn't authorized:
+In the `App` component (*App.razor*):
+
+* Wrap the `Router` component with the `CascadingAuthenticationState` component.
+* Add the `RedirectToLogin` component for unauthorized routes.
+
+The following shows the complete component if the app is also using the [TokenProvider service](xref:security/blazor/server#additional-token-scenarios):
 
 ```razor
+@inject TokenProvider TokenProvider
+
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(Program).Assembly">
         <Found Context="routeData">
-            <AuthorizeRouteView RouteData="@routeData" 
-                DefaultLayout="@typeof(MainLayout)">
+            <AuthorizeRouteView RouteData="@routeData"
+                                DefaultLayout="@typeof(MainLayout)">
                 <NotAuthorized>
                     <RedirectToLogin />
                 </NotAuthorized>
@@ -261,6 +262,20 @@ Replace the `App` component (*App.razor*) with the following code that triggers 
         </NotFound>
     </Router>
 </CascadingAuthenticationState>
+
+@code {
+    [Parameter]
+    public InitialApplicationState InitialState { get; set; }
+
+    protected override Task OnInitializedAsync()
+    {
+        TokenProvider.AccessToken = InitialState.AccessToken;
+        TokenProvider.RefreshToken = InitialState.RefreshToken;
+        TokenProvider.AntiXsrfToken = InitialState.AntiXsrfToken;
+
+        return base.OnInitializedAsync();
+    }
+}
 ```
 
 ### Style authentication endpoints
