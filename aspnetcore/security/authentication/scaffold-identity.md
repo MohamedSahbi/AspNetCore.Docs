@@ -216,7 +216,7 @@ Add a `LoginDisplay` component (*LoginDisplay.razor*) to the app's *Shared* fold
         <form action="/Identity/Account/Logout?returnUrl=%2F" method="post">
             <button class="nav-link btn btn-link" type="submit">Logout</button>
             <input name="__RequestVerificationToken" type="hidden" 
-                value="@TokenProvider.AntiXsrfToken">
+                value="@TokenProvider.XsrfToken">
         </form>
     </Authorized>
     <NotAuthorized>
@@ -271,7 +271,7 @@ The following shows the complete component if the app is also using the [TokenPr
     {
         TokenProvider.AccessToken = InitialState.AccessToken;
         TokenProvider.RefreshToken = InitialState.RefreshToken;
-        TokenProvider.AntiXsrfToken = InitialState.AntiXsrfToken;
+        TokenProvider.XsrfToken = InitialState.XsrfToken;
 
         return base.OnInitializedAsync();
     }

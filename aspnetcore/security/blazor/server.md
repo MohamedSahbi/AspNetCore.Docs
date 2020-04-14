@@ -137,7 +137,7 @@ public class InitialApplicationState
 {
     public string AccessToken { get; set; }
     public string RefreshToken { get; set; }
-    public string AntiXsrfToken { get; set; }
+    public string XsrfToken { get; set; }
 }
 ```
 
@@ -148,7 +148,7 @@ public class TokenProvider
 {
     public string AccessToken { get; set; }
     public string RefreshToken { get; set; }
-    public string AntiXsrfToken { get; set; }
+    public string XsrfToken { get; set; }
 }
 ```
 
@@ -175,7 +175,7 @@ In the *_Host.cshtml* file, create and instance of `InitialApplicationState` and
     {
         AccessToken = await HttpContext.GetTokenAsync("access_token"),
         RefreshToken = await HttpContext.GetTokenAsync("refresh_token"),
-        AntiXsrfToken = Xsrf.GetAndStoreTokens(HttpContext).RequestToken
+        XsrfToken = Xsrf.GetAndStoreTokens(HttpContext).RequestToken
     };
 }
 
@@ -200,7 +200,7 @@ In the `App` component (*App.razor*), resolve the service and initialize it with
     {
         TokenProvider.AccessToken = InitialState.AccessToken;
         TokenProvider.RefreshToken = InitialState.RefreshToken;
-        TokenProvider.AntiXsrfToken = InitialState.AntiXsrfToken;
+        TokenProvider.XsrfToken = InitialState.XsrfToken;
 
         return base.OnInitializedAsync();
     }
@@ -252,7 +252,7 @@ Any Razor component can request the `TokenProvider` service and obtain the XSRF 
         <form action="/Identity/Account/Logout?returnUrl=%2F" method="post">
             <button class="nav-link btn btn-link" type="submit">Logout</button>
             <input name="__RequestVerificationToken" type="hidden" 
-                value="@TokenProvider.AntiXsrfToken">
+                value="@TokenProvider.XsrfToken">
         </form>
     </Authorized>
     <NotAuthorized>
